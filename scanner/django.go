@@ -54,6 +54,18 @@ func configureDjango(sourceDir string, config *ScannerConfig) (*SourceInfo, erro
         vars["wsgiName"] = wsgiPath[0];
     }
 
+    settings, err := zglob.Glob(`./**/settings.py`)
+
+    if err == nil || len(settings) == 1 {
+        settingsPath := settings[0]
+
+        // check if STATIC_ROOT is set on settings.py
+        if checksPass(sourceDir, dirContains(settingsPath, "STATIC_ROOT")) {
+           vars["collectStatic"] = true
+           s.DeployDocs = `STATIC_ROOT was detected in your settings.py! Dockerfile will collect the static files.`
+       }
+    }
+
     s.Files = templatesExecute("templates/django", vars)
 
 	// check if project has a postgres dependency
