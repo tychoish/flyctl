@@ -147,7 +147,7 @@ func run(ctx context.Context) (err error) {
 		}
 
 		if params.PostgresConfiguration.InitialClusterSize > 1 {
-			fmt.Fprintf(io.Out, colorize.Yellow("Warning: --initial-cluster-size is ignored when forking from an existing cluster\n"))
+			fmt.Fprintf(io.Out, colorize.Yellow("Warning: --initial-cluster-size is ignored when forking from a volume\n"))
 			params.PostgresConfiguration.InitialClusterSize = 1
 		}
 
@@ -157,18 +157,16 @@ func run(ctx context.Context) (err error) {
 		}
 
 		if vol == nil {
-			return fmt.Errorf("Unable to resolve volume from fork-from target: %s", flag.GetString(ctx, "fork-from"))
+			return fmt.Errorf("Failed to resolve volume fork target: %s", flag.GetString(ctx, "fork-from"))
 		}
 
 		if vol.SizeGb > params.PostgresConfiguration.DiskGb {
-			return fmt.Errorf("The target volume size %dGB must be greater than or equal to the fork-from target: %dGB", params.PostgresConfiguration.DiskGb, vol.SizeGb)
+			return fmt.Errorf("The target volume size %dGB must be greater than or equal to the volume fork target: %dGB", params.PostgresConfiguration.DiskGb, vol.SizeGb)
 		}
 
 		if vol.Region != region.Code {
-			return fmt.Errorf("The target region %q must match the region associated with the fork target: %q", region.Code, vol.Region)
+			return fmt.Errorf("Target region %q must match the region of the fork target: %q", region.Code, vol.Region)
 		}
-
-		fmt.Fprintf(io.Out, "Forking from volume %s\n", vol.ID)
 
 		params.ForkFrom = vol.ID
 	}
@@ -482,12 +480,12 @@ func resolveForkFromTarget(ctx context.Context, client *api.Client, forkFrom str
 	forkSlice := strings.Split(forkFrom, ":")
 
 	if len(forkSlice) > 2 {
-		return nil, fmt.Errorf("invalid --fork-from format")
+		return nil, fmt.Errorf("invalid --fork-from format. See `fly pg create --help` for more information")
 	}
 
 	app, err = client.GetAppCompact(ctx, forkSlice[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve from-from app %s: %w", forkSlice[0], err)
+		return nil, fmt.Errorf("Failed to resolve the specified from-from app %s: %w", forkSlice[0], err)
 	}
 
 	if len(forkSlice) == 2 {
@@ -498,7 +496,7 @@ func resolveForkFromTarget(ctx context.Context, client *api.Client, forkFrom str
 	}
 
 	if !app.IsPostgresApp() {
-		return nil, fmt.Errorf("app %s is not a postgres app", app.Name)
+		return nil, fmt.Errorf("The target fork-from app %q is not a postgres app", app.Name)
 	}
 
 	// If volume was specified, we are done here
@@ -513,11 +511,11 @@ func resolveForkFromTarget(ctx context.Context, client *api.Client, forkFrom str
 
 	machines, err := mach.ListActive(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list machines on target app %s: %w", app.Name, err)
+		return nil, fmt.Errorf("Failed to list machines associated with %s: %w", app.Name, err)
 	}
 
 	if len(machines) == 0 {
-		return nil, fmt.Errorf("No machines associated with %s, please manually specify the volume you wish to fork. See `fly pg create --help` for more information", app.Name)
+		return nil, fmt.Errorf("No machines associated with fork-from app %s, consider specifiying the volume you wish to fork. See `fly pg create --help` for more information", app.Name)
 	}
 
 	primaryRegion := machines[0].Config.Env["PRIMARY_REGION"]
@@ -537,11 +535,11 @@ func resolveForkFromTarget(ctx context.Context, client *api.Client, forkFrom str
 		volID := m.Config.Mounts[0].Volume
 		vol, err := client.GetVolume(ctx, volID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve the volume associated with the leader %s: %w", volID, err)
+			return nil, fmt.Errorf("failed to resolve volume %s: %w", volID, err)
 		}
 
 		return vol, nil
 	}
 
-	return nil, err
+	return nil, fmt.Errorf("Failed to resolve volume to fork from. See `fly pg create --help` for more information")
 }
