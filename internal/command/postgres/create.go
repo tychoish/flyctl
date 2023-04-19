@@ -160,6 +160,10 @@ func run(ctx context.Context) (err error) {
 			return fmt.Errorf("Unable to resolve volume from fork-from target: %s", flag.GetString(ctx, "fork-from"))
 		}
 
+		if vol.SizeGb > params.PostgresConfiguration.DiskGb {
+			return fmt.Errorf("The target volume size %dGB must be greater than or equal to the fork-from target: %dGB", params.PostgresConfiguration.DiskGb, vol.SizeGb)
+		}
+
 		if vol.Region != region.Code {
 			return fmt.Errorf("The target region %q must match the region associated with the fork target: %q", region.Code, vol.Region)
 		}
