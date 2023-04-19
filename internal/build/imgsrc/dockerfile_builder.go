@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/superfly/flyctl/helpers"
 	"github.com/superfly/flyctl/internal/cmdfmt"
+	"github.com/superfly/flyctl/internal/metrics"
 	"github.com/superfly/flyctl/internal/render"
 	"github.com/superfly/flyctl/iostreams"
 	"github.com/superfly/flyctl/terminal"
@@ -163,6 +164,9 @@ func (*dockerfileBuilder) Run(ctx context.Context, dockerFactory *dockerClientFa
 		return docker.Info(infoCtx)
 	}()
 	if err != nil {
+		if dockerFactory.IsRemote() {
+			metrics.SendNoData("remote_builder_failure")
+		}
 		build.ImageBuildFinish()
 		build.BuildFinish()
 		return nil, "", errors.Wrap(err, "error fetching docker server info")
@@ -182,6 +186,9 @@ func (*dockerfileBuilder) Run(ctx context.Context, dockerFactory *dockerClientFa
 	buildkitEnabled, err := buildkitEnabled(docker)
 	terminal.Debugf("buildkitEnabled", buildkitEnabled)
 	if err != nil {
+		if dockerFactory.IsRemote() {
+			metrics.SendNoData("remote_builder_failure")
+		}
 		build.ImageBuildFinish()
 		build.BuildFinish()
 		return nil, "", errors.Wrap(err, "error checking for buildkit support")
@@ -190,6 +197,9 @@ func (*dockerfileBuilder) Run(ctx context.Context, dockerFactory *dockerClientFa
 	if buildkitEnabled {
 		imageID, err = runBuildKitBuild(ctx, streams, docker, r, opts, relativedockerfilePath, buildArgs)
 		if err != nil {
+			if dockerFactory.IsRemote() {
+				metrics.SendNoData("remote_builder_failure")
+			}
 			build.ImageBuildFinish()
 			build.BuildFinish()
 			return nil, "", errors.Wrap(err, "error building")
@@ -197,6 +207,9 @@ func (*dockerfileBuilder) Run(ctx context.Context, dockerFactory *dockerClientFa
 	} else {
 		imageID, err = runClassicBuild(ctx, streams, docker, r, opts, relativedockerfilePath, buildArgs)
 		if err != nil {
+			if dockerFactory.IsRemote() {
+				metrics.SendNoData("remote_builder_failure")
+			}
 			build.ImageBuildFinish()
 			build.BuildFinish()
 			return nil, "", errors.Wrap(err, "error building")
@@ -413,13 +426,20 @@ func runBuildKitBuild(ctx context.Context, streams *iostreams.IOStreams, docker 
 }
 
 func pushToFly(ctx context.Context, docker *dockerclient.Client, streams *iostreams.IOStreams, tag string) error {
+
+	metrics.Started("image_push")
+	sendImgPushMetrics := metrics.StartTiming("image_push/duration")
+
 	pushResp, err := docker.ImagePush(ctx, tag, types.ImagePushOptions{
 		RegistryAuth: flyRegistryAuth(),
 	})
+	metrics.Status("image_push", err == nil)
+
 	if err != nil {
 		return errors.Wrap(err, "error pushing image to registry")
 	}
 	defer pushResp.Close() //skipcq: GO-S2307
+	sendImgPushMetrics()
 
 	err = jsonmessage.DisplayJSONMessagesStream(pushResp, streams.ErrOut, streams.StderrFd(), streams.IsStderrTTY(), nil)
 	if err != nil {
