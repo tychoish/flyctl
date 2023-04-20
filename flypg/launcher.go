@@ -176,7 +176,7 @@ func (l *Launcher) LaunchMachinesPostgres(ctx context.Context, config *CreateClu
 		if config.ForkFrom != "" {
 			targetVolume, err := l.client.GetVolume(ctx, config.ForkFrom)
 			if err != nil {
-				return fmt.Errorf("unable to find fork target volume %s: %w", config.ForkFrom, err)
+				return fmt.Errorf("failed to resolve the volume fork target %s: %w", config.ForkFrom, err)
 			}
 
 			machineConf.Env["FLY_RESTORED_FROM"] = config.ForkFrom
@@ -190,7 +190,7 @@ func (l *Launcher) LaunchMachinesPostgres(ctx context.Context, config *CreateClu
 
 			vol, err = l.client.ForkVolume(ctx, volInput)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to fork volume: %w", err)
 			}
 		} else {
 			volInput := api.CreateVolumeInput{
@@ -205,7 +205,7 @@ func (l *Launcher) LaunchMachinesPostgres(ctx context.Context, config *CreateClu
 
 			vol, err = l.client.CreateVolume(ctx, volInput)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to create volume: %w", err)
 			}
 		}
 
