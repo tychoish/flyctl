@@ -147,17 +147,13 @@ func run(ctx context.Context) (err error) {
 		}
 
 		if params.PostgresConfiguration.InitialClusterSize > 1 {
-			fmt.Fprintf(io.Out, colorize.Yellow("Warning: --initial-cluster-size is ignored when forking from a volume\n"))
+			fmt.Fprintf(io.Out, colorize.Yellow("Warning: --initial-cluster-size is ignored when specifying --fork-from\n"))
 			params.PostgresConfiguration.InitialClusterSize = 1
 		}
 
 		vol, err := resolveForkFromTarget(ctx, client, flag.GetString(ctx, "fork-from"))
 		if err != nil {
 			return err
-		}
-
-		if vol == nil {
-			return fmt.Errorf("Failed to resolve volume fork target: %s", flag.GetString(ctx, "fork-from"))
 		}
 
 		if vol.SizeGb > params.PostgresConfiguration.DiskGb {
@@ -520,6 +516,7 @@ func resolveForkFromTarget(ctx context.Context, client *api.Client, forkFrom str
 
 	primaryRegion := machines[0].Config.Env["PRIMARY_REGION"]
 
+	// Attempt to resolve the volume associated with the primary machine
 	for _, m := range machines {
 		// Exclude machines that are not in the primary region
 		if m.Config.Env["PRIMARY_REGION"] != primaryRegion {
@@ -527,7 +524,7 @@ func resolveForkFromTarget(ctx context.Context, client *api.Client, forkFrom str
 		}
 
 		role := machineRole(m)
-		// Exclude machines that are not primary (flex) or leader (stolon)
+		// Exclude machines that are not the primary (flex) or leader (stolon)
 		if role != "primary" && role != "leader" {
 			continue
 		}
