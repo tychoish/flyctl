@@ -520,37 +520,6 @@ func MachineVMSizes() []api.VMSize {
 	}
 }
 
-// func resolveForkFromManager(ctx context.Context, app *api.AppCompact, forkFrom string) (string, error) {
-
-// 	machines, err := mach.ListActive(ctx)
-// 	if err != nil {
-// 		return "", fmt.Errorf("Failed to list machines associated with %s: %w", app.Name, err)
-// 	}
-
-// 	if len(machines) == 0 {
-// 		return "", fmt.Errorf("No machines associated with fork-from app %s, consider specifiying the manager you wish to fork. See `fly pg create --help` for more information", app.Name)
-// 	}
-
-// 	primaryRegion := machines[0].Config.Env["PRIMARY_REGION"]
-
-// 	// Attempt to resolve the manager associated with the primary machine
-// 	for _, m := range machines {
-// 		// Exclude machines that are not in the primary region
-// 		if m.Config.Env["PRIMARY_REGION"] != primaryRegion {
-// 			continue
-// 		}
-
-// 		// Exclude machines that are not running the same manager
-// 		if m.Config.Env["MANAGER"] != machines[0].Config.Env["MANAGER"] {
-// 			continue
-// 		}
-
-// 		return m.Config.Env["MANAGER"], nil
-// 	}
-
-// 	return "", fmt.Errorf("Unable to resolve manager for fork-from app %s", app.Name)
-// }
-
 func resolveForkFromVolume(ctx context.Context, machines []*api.Machine) (string, error) {
 	primaryRegion := machines[0].Config.Env["PRIMARY_REGION"]
 
